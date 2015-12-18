@@ -3,6 +3,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 static float apply_kernel(float* data, int x, int y, int sx, int sy, filter_kernel_t* kernel)
 {
@@ -153,8 +154,8 @@ pgm_data_t* filter_pgm_data_and_destroy(pgm_data_t* in, filter_kernel_t* kernel)
 
 #define SIXTEENTH 1.0/16.0
 float canny_blur_kernel[3][3] = {{SIXTEENTH*1.0,SIXTEENTH*2.0,SIXTEENTH*1.0},
-								  {SIXTEENTH*2.0,SIXTEENTH*4.0,SIXTEENTH*2.0},
-								  {SIXTEENTH*1.0,SIXTEENTH*2.0,SIXTEENTH*1.0}};
+				{SIXTEENTH*2.0,SIXTEENTH*4.0,SIXTEENTH*2.0},
+				{SIXTEENTH*1.0,SIXTEENTH*2.0,SIXTEENTH*1.0}};
 
 float sobel_x[3][3] = {
 		{1, 0, -1},
@@ -170,9 +171,17 @@ pgm_data_t* apply_canny_filter(pgm_data_t* in, float tau)
 {
 	if(!in) return NULL;
 
-	// Blur image
-	// FIXME: The struct layout allows giving the kernel as a float array. Should a real kernel object be used?
-	pgm_data_t* result = filter_pgm_data(in, canny_blur_kernel);
+	// Set up filter kernels
+	// TODO: Should be done only one time!
+	filter_kernel_t canny_blur;
+	filter_kernel_t sobel_x_kernel;
+	filter_kernel_t sobel_y_kernel;
+	
+	memcpy(canny_blur.array, canny_blur_kernel, sizeof(canny_blur_kernel));
+	memcpy(sobel_x_kernel.array, sobel_x, sizeof(canny_blur_kernel));
+	memcpy(sobel_y_kernel.array, sobel_y, sizeof(canny_blur_kernel));
+	
+	pgm_data_t* result = filter_pgm_data(in, &canny_blur);
 
 	pgm_data_t* euklid_image = construct_pgm_data(in->sx, in->sy);
 	pgm_data_t* gradients = construct_pgm_data(in->sx, in->sy);
@@ -188,8 +197,8 @@ pgm_data_t* apply_canny_filter(pgm_data_t* in, float tau)
 		for(size_t y = 0; y < in->sy; y++)
 		{
 			offset = in->sx * y + x;
-			px = apply_kernel(result->array, x, y, in->sx, in->sy, sobel_x);
-			py = apply_kernel(result->array, x, y, in->sx, in->sy, sobel_y);
+			px = apply_kernel(result->array, x, y, in->sx, in->sy, &sobel_x_kernel);
+			py = apply_kernel(result->array, x, y, in->sx, in->sy, &sobel_y_kernel);
 
 			// Calculate gradient if possible
 			if(py > 0)
